@@ -429,19 +429,14 @@ class GoodWeCommunicator :
       inverter.fac3 = self.bytesToFloat(data[dtPtr:(dtPtr+2)], 100)
       dtPtr += 2
     inverter.pac = ((data[dtPtr]) << 8) | (data[dtPtr + 1])
-    #Domoticz.Log(str(inverter.pac))
     dtPtr += 2
     inverter.workMode = ((data[dtPtr]) << 8) | (data[dtPtr + 1])
-    #Domoticz.Log(str(inverter.workMode))
     dtPtr += 2
     inverter.temp = self.bytesToFloat(data[dtPtr:dtPtr+2], 10)
-    #Domoticz.Log(str(inverter.temp))
     dtPtr += 2+4
     inverter.eTotal = self.fourBytesToFloat(data[dtPtr:dtPtr+4], 10)
-    #Domoticz.Log(str(inverter.eTotal))
     dtPtr += 4
     inverter.hTotal = self.fourBytesToFloat(data[dtPtr:dtPtr+4], 1)
-    #Domoticz.Log(str(inverter.hTotal))
     dtPtr += 4+8
     if (inverter.isDTSeries):
       dtPtr += 4
@@ -456,13 +451,12 @@ class GoodWeCommunicator :
 
     if (self.debugInverters) :
       s=  'Pac={num:.1f} '.format(num=inverter.pac)
+      s=s+'Eday={num:.1f} '.format(num=inverter.eDay)
       s=s+'V1={num:.1f} '.format(num=inverter.vpv1)
       s=s+'V2={num:.1f} '.format(num=inverter.vpv2)
       s=s+'I1={num:.1f} '.format(num=inverter.ipv1)
       s=s+'I2={num:.1f} '.format(num=inverter.ipv2)
       s=s+'Fac={num:.1f} '.format(num=inverter.fac1)
-      s=s+'P={num:.1f} '.format(num=inverter.pac)
-      s=s+'Eday={num:.1f} '.format(num=inverter.eDay)
       s=s+'eTot={num:.1f} '.format(num=inverter.eTotal)
       s=s+'hTot={num:.1f} '.format(num=inverter.hTotal)
       s=s+'T={num:.1f} '.format(num=inverter.temp)
@@ -514,9 +508,6 @@ class GoodWeCommunicator :
     RegisterData += address.to_bytes(1,'big')   #append bytearray (1).to_bytes(1, byteorder='big')
     # //need to send alloc msg
     self.sendData(0x7F, 0x00, 0x01, RegisterData)
-
-
-
 
 
   def handle(self) :
