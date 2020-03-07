@@ -22,21 +22,19 @@ import serial
 #log = logging.getLogger()
 #log.setLevel(logging.DEBUG)
 
-
 try:
     import Domoticz
 except ImportError:
     import fakeDomoticz as Domoticz
 
-
 class CInverter :
-  def __init__(self) : #, serialNumber, address, addressConfirmed, lastSeen, isOnline, isDTSeries, vpv1, vpv2, ipv1, ipv2, vac1, vac2, vac3, iac1, iac2, iac3, fac1, fac2, fac3, pac, workMode, temp, errorMessage, eTotal, hTotal, tempFault, pv1Fault, pv2Fault, line1VFault, line2VFault, line3VFault, line1FFault, line2FFault, line3FFault, gcfiFault, eDay) :
-    self.serialNumber=bytearray(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00') #    #//serial number (ascii) from inverter with zero appended
-    self.address = 0        #address provided by this software
-    self.addressConfirmed=False #;    //wether or not the address is confirmed by te inverter
-    self.lastSeen = 0 #;    //when was the inverter last seen? If not seen for 30 seconds the inverter is marked offline. 
-    self.isOnline = False #;        //is the inverter online (see above)
-    self.isDTSeries = False #;      //is tri phase inverter (get phase 2, 3 info)
+  def __init__(self) :
+    self.serialNumber=bytearray(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00') # serial number (ascii) from inverter with zero appended
+    self.address = 0                # address provided by this software
+    self.addressConfirmed=False     # wether or not the address is confirmed by te inverter
+    self.lastSeen = 0               # when was the inverter last seen? If not seen for 30 seconds the inverter is marked offline.
+    self.isOnline = False           # is the inverter online (see above)
+    self.isDTSeries = False         # is tri phase inverter (get phase 2, 3 info)
     self.vpv1=0.0
     self.vpv2=0.0
     self.ipv1=0.0
@@ -76,29 +74,23 @@ class GoodWeCommunicator :
     self.debugPackets = False
     self.debugInverters = True
     self.GOODWE_COMMS_ADDRES = 0xFE
-    self.DISCOVERY_INTERVAL_SECS = 60 # 10 secs
-    self.PACKET_TIMEOUT_SECS = 5
+    self.DISCOVERY_INTERVAL_SECS = 60     # 10 secs between disovery
+    self.PACKET_TIMEOUT_SECS = 5          # 5 sec packet timeout
 
     self.inverter = CInverter()
 
-    #define PACKET_TIMEOUT 5000			//5 sec packet timeout
-    #define DISCOVERY_INTERVAL 10000	//10 secs between discovery 
-    #define INFO_INTERVAL 1000			//get inverter info every second
-    self.OFFLINE_TIMEOUT_SECS = 30   #		//30 seconds no data -> inverter offline
+    #define INFO_INTERVAL 1000	          # get inverter info every second
+    self.OFFLINE_TIMEOUT_SECS = 30        # 30 seconds no data -> inverter offline
     Domoticz.Log("Goodwe initialized")
     self.SerialStatus = False
 
 
   def serial_write_wrapper (self, btarr) :
     if (self.debugPackets) :
-       #print("Sending data to inverter(s): ", end="")
-       #Domoticz.Log(str(len(btarr)))
-
        strcat="Sending data to inverter(s): "
        for cnt in range(0,len(btarr)) :
         s=""
         if (cnt==0):
-          print("Hdr: ", end="")
           s="Hdr: "
         if (cnt==2):
           s="SRC/DST: "
@@ -114,19 +106,18 @@ class GoodWeCommunicator :
        Domoticz.Log(strcat)
     try:
       self.goodweSerial.write(btarr)
-    except: 
+    except:
       Domoticz.Log("Data sent failed")
       self.SerialStatus=False
 
   def connect(self, SerialPort) :
     Domoticz.Log("GoodWe Connect start.")
     self.goodweSerial = serial.Serial(SerialPort, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout = 0.1 )  # open serial port
-    #//remove all registered inverters. This is usefull when restarting the ESP. The inverter still thinks it is registered
-    #//but this program does not know the address. The timeout is 10 minutes.
+    # remove all registered inverters. This is usefull when restarting the ESP. The inverter still thinks it is registered
+    # but this program does not know the address. The timeout is 10 minutes.
     for cnt in range(1,2): #256
       self.sendRemoveRegistration(cnt)
       time.sleep(1)
-    print("GoodWe Communicator connected.")
     Domoticz.Log("Goodwe Communicator connected")
     self.SerialStatus=True
 
@@ -139,8 +130,6 @@ class GoodWeCommunicator :
     self.numToRead = 0
     self.lastUsedAddress = 0
 
-
-
   def stop(self) :
     self.SerialStatus=False
     self.goodweSerial.close()             # close port
@@ -149,10 +138,6 @@ class GoodWeCommunicator :
   def toHex(self,bt):
     s='{bt:02X} '.format(bt=bt)
     return s
-
-  def debugPrintHex(self, bt):
-    h = hex(bt)
-    print('{bt:02X} '.format(bt=bt), end="")
 
   def sendRemoveRegistration(self, address) :
     #send out the remove address to the inverter. If the inverter is still connected it will reconnect after discovery
@@ -170,7 +155,7 @@ class GoodWeCommunicator :
 
     # check if we need to write the data part and send it.
     if (len(data)>0) :
-      PacketData += data #.append(data)
+      PacketData += data
 
     # need to send out the crc which is the addition of all previous values.
     crc = 0
@@ -184,24 +169,24 @@ class GoodWeCommunicator :
 
   def sendDiscovery(self):
     # send out discovery for unregistered devices.
-    if (self.debugPackets):
-      print("Sending discovery")
+    if (self.debugInverters):
+      Domoticz.Log("Sending discovery")
     self.sendData(0x7F, 0x00, 0x00, bytearray())
 
   def checkOfflineInverters(self) :
-    # //check inverter timeout
+    # check inverter timeout
     # for (char index = 0; index < inverters.size(); ++index)
-    newOnline = (time.time() - self.inverter.lastSeen) < self.OFFLINE_TIMEOUT_SECS  #millis()
+    newOnline = (time.time() - self.inverter.lastSeen) < self.OFFLINE_TIMEOUT_SECS
     #print ('newOnline', newOnline)
     if (self.inverter.isOnline and not(newOnline)) :
-      # //check if inverter timed out
-      if (self.debugPackets) :
-        print("Marking inverter @ address: ", end="")
-        print(self.inverter.address, end="")
-        print("offline.")
+      # check if inverter timed out
+      if (self.debugInverters) :
+        s="Marking inverter @ address: {num) as offline".format(num=self.inverter.address)
+        Domoticz.Log(s)
       sendRemoveRegistration(self.inverter.address)  # send in case the inverter thinks we are online
-      self.inverter.isOnline = self.inverter.addressConfirmed = False
-    elif (not(self.inverter.isOnline) and not(newOnline)) : # //still offline
+      self.inverter.isOnline = False
+      self.inverter.addressConfirmed = False
+    elif (not(self.inverter.isOnline) and not(newOnline)) : # still offline
       #offline inverter. Reset eday at midnight
       if (self.inverter.eDay > 0 and hour() == 0 and minute() == 0) :
         self.inverter.eDay = 0
@@ -217,45 +202,39 @@ class GoodWeCommunicator :
 
     self.inverter.isOnline = newOnline
 
-
-
   def checkIncomingData(self) :
    time.sleep(0.1)
-   try: 
+   try:
     if (self.goodweSerial.inWaiting()):
       if (self.debugPackets) :
-        print ('checkIncomingData: data received ', end="")
         strcat='checkIncomingData: data received '
 
       while (self.goodweSerial.inWaiting() > 0) :
         incomingData = ord(self.goodweSerial.read(1))
         if (self.debugPackets) :
-          #self.debugPrintHex(incomingData)
-          #Domoticz.Log("Rec:" + str(incomingData))
           strcat=strcat+'{bt:02X} '.format(bt=incomingData)
 
-
-        # //wait for packet start. if found read until data length  + data. 
-        # //set the time we received the data so we can use some kind of timeout
+        # wait for packet start. if found read until data length  + data.
+        # set the time we received the data so we can use some kind of timeout
         if (not(self.startPacketReceived) and (self.lastReceivedByte == 0xAA and incomingData == 0x55)) :
-          # //packet start received
-          self.startPacketReceived = True 
+          # packet start received
+          self.startPacketReceived = True
           self.lastReceived = time.time()
           self.inputBuffer=bytearray()
           self.numToRead = 0
           self.lastReceivedByte = 0x00 #reset last received for next packet
         elif (self.startPacketReceived) :
-          if (self.numToRead > 0) or (len(self.inputBuffer)<5) : #self.curReceivePtr < 5) :
+          if (self.numToRead > 0) or (len(self.inputBuffer)<5) :
              self.inputBuffer.append(incomingData)
              if (len(self.inputBuffer) == 5) :
-               # //we received the data length. keep on reading until data length is read.
-               # //we need to add two for the crc calculation
+               # we received the data length. keep on reading until data length is read.
+               # we need to add two for the crc calculation
                self.numToRead = self.inputBuffer[4] + 2
-             elif (len(self.inputBuffer)>5) : # self.curReceivePtr > 5) :
+             elif (len(self.inputBuffer)>5) :
                 self.numToRead -= 1
-          if (len(self.inputBuffer)>=5 and self.numToRead == 0) : #self.curReceivePtr >= 5
-            # //got the complete packet => parse it
-            self.startPacketReceived = False 
+          if (len(self.inputBuffer)>=5 and self.numToRead == 0) :
+            # got the complete packet => parse it
+            self.startPacketReceived = False
             self.parseIncomingData(self.inputBuffer)
         elif not(self.startPacketReceived) :
           self.lastReceivedByte = incomingData   # keep track of the last incoming byte so we detect the packet start
@@ -263,31 +242,19 @@ class GoodWeCommunicator :
       if (self.debugPackets) :
         Domoticz.Log(strcat)
 
-    if (self.startPacketReceived and (time.time() - self.lastReceived > PACKET_TIMEOUT_SECS)) : # 0.5 sec timoeut
-      # //there is an open packet timeout. 
+    if (self.startPacketReceived and (time.time() - self.lastReceived > PACKET_TIMEOUT_SECS)) :
+      # there is an open packet timeout. 
       self.startPacketReceived = False #wait for start packet again
-      print("Warning: Comms timeout.")
+      Domoticz.Log("Warning: Comms timeout.")
    except :
       Domoticz.Log("Serialport failed, restart required")
       self.SerialStatus=False
-       
-     
 
 
   def parseIncomingData(self, incomingData):
-    #print("parseIncomingData")
-    # //first check the crc
-    # //Data always start without the start bytes of 0xAA 0x55
-    # //incomingDataLength also has the crc data in it
-    if (self.debugPackets):
-       print("")
-       #print("Parsing incoming data with length: ", end="")
-
-       #self.debugPrintHex(len(incomingData))
-       #print("d(", len(incomingData), ") ", end="")
-       #for cnt in range (0, len(incomingData)) :
-       #  self.debugPrintHex(incomingData[cnt])
-       #  print(" ", end="")
+    # first check the crc
+    # Data always start without the start bytes of 0xAA 0x55
+    # incomingDataLength also has the crc data in it
 
     crc = 0xAA + 0x55
     for cnt in range (0,  len(incomingData) - 2) :
@@ -295,49 +262,53 @@ class GoodWeCommunicator :
     high = (crc >> 8) & 0xff
     low = crc & 0xff
 
+    s=""
     if (self.debugPackets):
-       print("CRC received: ", end="")
-       self.debugPrintHex(incomingData[len(incomingData) - 2])
-       self.debugPrintHex(incomingData[len(incomingData) - 1])
-       print(", calculated CRC: ", end="")
-       self.debugPrintHex(high)
-       self.debugPrintHex(low)
+       s = "CRC received: "
+       s = s + self.toHex(incomingData[len(incomingData) - 2])
+       s = s + self.toHex(incomingData[len(incomingData) - 1])
+       s = s + ", calculated CRC: "
+       s = s + self.toHex(high) + " "
+       s = s + self.toHex(low)
     # CRC matches?
     if not ((high == incomingData[len(incomingData) - 2]) and (low == incomingData[len(incomingData) - 1])) :
-      Domoticz.Log("=> CRC Fail.")
+      s=s+"=> CRC Fail."
+      Domoticz.Log(s)
+      return
     if (self.debugPackets):
-      Domoticz.Log("=> CRC match.")
+      Domoticz.Log(s+"=> CRC match.")
 
-    #print("ParseIncoming data: check action", incomingData[2], incomingData[3])
-    # //check the control code and function code to see what to do
+    # check the control code and function code to see what to do
     if (incomingData[2] == 0x00 and incomingData[3] == 0x80) :          #00 80 Register Request
        self.handleRegistration(incomingData[5:len(incomingData)-2])     #   -> payload (skip length)
     elif (incomingData[2] == 0x00 and incomingData[3] == 0x81) :        #00 81 Address Confirm
        self.handleRegistrationConfirmation(incomingData[0])             #   -> address
-    elif (incomingData[2] == 0x01 and incomingData[3] == 0x81) :        #01 81 Resonse Running Info 
+    elif (incomingData[2] == 0x01 and incomingData[3] == 0x81) :        #01 81 Resonse Running Info
       self.handleIncomingInformation(incomingData[0], incomingData[5:len(incomingData) - 2]) # + 5) payload
 
 
-  def handleRegistration(self, serialNumber) : #, char length) :
-    # //check if the serialnumber isn't listed yet. If it is use that one
-    # //Add the serialnumber, generate an address and send it to the inverter
+  def handleRegistration(self, serialNumber) :
+    # check if the serialnumber isn't listed yet. If it is use that one
+    # Add the serialnumber, generate an address and send it to the inverter
     if (len(serialNumber) != 16) :
       if (self.debugPackets):
-        print("=> length serialnumer != 16 (", len(serialNumber), ")")
+       s="Error: length serialnumer != 16 ({num})".format(num=len(serialNumber))
+       Domoticz.Log(s)
       return
 
     #for index in range (0,  index < inverters.size(); ++index)
-    # //check inverter 
+    # check inverter
     if (self.inverter.serialNumber == serialNumber) :
-      print("Already registered, inverter re-registered with address: ", end="")
-      println(self.inverter.address)
+      if (self.debugPackets):
+        s="Already registered, inverter re-registered with address: {num}".format(num=self.inverter.address)
+        Domoticz.Log(s)
       # found it. Set to unconfirmed and send out the existing address to the inverter
       self.inverter.addressConfirmed = False
       self.inverter.lastSeen = time.time()
       self.sendAllocateRegisterAddress(serialNumber, self.inverter.address)
       return
 
-    # //still here. This a new inverter
+    # still here. This a new inverter
     # GoodWeCommunicator::GoodweInverterInformation newInverter
     # newInverter.addressConfirmed = false;
     self.inverter.addressConfirmed = False
@@ -346,38 +317,38 @@ class GoodWeCommunicator :
     # newInverter.isDTSeries = false; //TODO. Determine if DT series inverter by getting info
     self.inverter.serialNumer=serialNumber
     # //get the new address. Add one (overflows at 255) and check if not in use
-    self.lastUsedAddress += 1 
+    self.lastUsedAddress += 1
     #while (getInverterInfoByAddress(lastUsedAddress) != nullptr)
-    #  self.lastUsedAddress += 1 
+    #  self.lastUsedAddress += 1
     # newInverter.address = lastUsedAddress;
     self.inverter.address = self.lastUsedAddress
     # inverters.push_back(newInverter);
-    if (self.debugPackets) :
-      print("New inverter found. Current # registrations: ", end="")
-      print(1) #inverters.size())
+    #    if (self.debugInverters) :
+    #  s="New inverter found. Current # registrations: {num}".format(num=1)
+    #  Domoticz.Log(s)
 
     self.sendAllocateRegisterAddress(serialNumber, self.lastUsedAddress)
 
 
   def handleRegistrationConfirmation(self, address) :
-    if (self.debugPackets) :
-      print("Handling registration information for address: ", end="")
-      print(address)
-    # //lookup the inverter and set it to confirmed
+    if (self.debugInverters) :
+      s="Handling registration information for address: {num}".format(num=address)
+      Domoticz.Log(s)
+    # lookup the inverter and set it to confirmed
     self.inverter = self.getInverterInfoByAddress(address)
     if (self.inverter) :
-      if (self.debugPackets) :
-         print("Inverter information found in list of inverters.")
+      if (self.debugInverters) :
+         Domoticz.Log("Inverter information found in list of inverters.")
       self.inverter.addressConfirmed = True
       self.inverter.isOnline = False # //inverter is online, but we first need to get its information
       self.inverter.lastSeen = time.time() #millis()
     else :
-      if (self.debugPackets) :
-        print("Error. Could not find the inverter with address: ")
-        print(address)
-        print("Current # registrations: ")
-        #print(inverters.size())
-        # //get the information straight away
+      if (self.debugInverters) :
+        s="Error. Could not find the inverter with address: {num}".format(num=address)
+        Domoticz.Log(s)
+        #s="Current # registrations: {num}".format(num=1)     # (inverters.size())
+        #Domoticz.Log(s)
+        # get the information straight away
       self.askInverterForInformation(address)
 
   def handleIncomingInformation(self, address, data) :
@@ -392,11 +363,8 @@ class GoodWeCommunicator :
       Domoticz.Log("handleIncomingInformation: Error, Insuffient information")
       return
 
-    # //data from iniverter, means online
-    try:
-      inverter.lastSeen = time.time()
-    except:
-      Domoticz.Log('time failed')
+    # data from iniverter, means online
+    inverter.lastSeen = time.time()
 
     dtPtr = 0
     inverter.vpv1 = self.bytesToFloat(data[dtPtr:(dtPtr+2)],10)
@@ -446,7 +414,7 @@ class GoodWeCommunicator :
     dtPtr += 2
     inverter.eDay   = self.bytesToFloat(data[dtPtr: dtPtr+2], 10)
 
-    # //isonline is set after first batch of data is set so readers get actual data 
+    # isonline is set after first batch of data is set so readers get actual data
     inverter.isOnline = True
 
     if (self.debugInverters) :
@@ -476,13 +444,11 @@ class GoodWeCommunicator :
       if ((self.inverter.addressConfirmed) and (self.inverter.isOnline))  :
          self.askInverterForInformation(self.inverter.address)
       else :
-        if (self.debugPackets) :
-          print("Not asking inverter with address: ", end="")
-          print(self.inverter.address, end="")
-          print(" for information. Addressconfirmed: ", end="")
-          print(self.inverter.addressConfirmed, end="")
-          print(", isOnline: ", end="")
-          print(self.inverter.isOnline)
+        if (self.debugInverters) :
+          s=  "Not asking inverter with address: {num} ".format(num=self.inverter.address)
+          s=s+"for information. Addressconfirmed: {num}".format(num=self.inverter.addressConfirmed)
+          s=s+", isOnline: {num}".format(num=self.inverter.isOnline)
+          Domoticz.Log(s)
 
 
   def askInverterForInformation(self, address) :
@@ -490,39 +456,39 @@ class GoodWeCommunicator :
 
   def getInverterInfoByAddress(self, address) :
     #for chr in range(1, 1) # inverters.size())
-    # //check inverter 
+    # check inverter 
     #if (inverters[index].address == address)
     #  return &inverters[index]
     return self.inverter
     #return 0
 
   def sendAllocateRegisterAddress(self, serialNumber, address) :
-    if (self.debugPackets) :
-      print("SendAllocateRegisterAddress address: ", end="")
-      print(address)
+    if (self.debugInverters) :
+      s="SendAllocateRegisterAddress address: {num}".format(num=address)
+      Domoticz.Log(s)
 
-    # //create our registrationpacket with serialnumber and address and send it over
+    # create our registrationpacket with serialnumber and address and send it over
     # char RegisterData[17];
     # memcpy(RegisterData, serialNumber, 16);
     RegisterData=serialNumber
     RegisterData += address.to_bytes(1,'big')   #append bytearray (1).to_bytes(1, byteorder='big')
-    # //need to send alloc msg
+    # need to send alloc msg
     self.sendData(0x7F, 0x00, 0x01, RegisterData)
 
 
   def handle(self) :
-    # //always check for incoming data
+    # always check for incoming data
     self.checkIncomingData()
 
-    # //check for offline inverters
+    # check for offline inverters
     self.checkOfflineInverters()
 
-    # //discovery every 10 secs.
+    # discovery every 10 secs.
     if (time.time() - self.lastDiscoverySentSeconds >= self.DISCOVERY_INTERVAL_SECS) :
       self.sendDiscovery()
       self.lastDiscoverySentSeconds = time.time()
 
-    # //ask for info update every second
+    # ask for info update every second
     if (time.time() - self.lastDiscoverySentSeconds >= 1) :
       self.askAllInvertersForInformation()
       self.lastDiscoverySentSeconds = time.time()
@@ -534,6 +500,7 @@ class GoodWeCommunicator :
 class BasePlugin:
     enabled = False
     def __init__(self):
+        Domoticz.Log("__init__ called")
         self.Goodwe = GoodWeCommunicator()
         return
 
@@ -572,19 +539,19 @@ class BasePlugin:
         Domoticz.Log("onDisconnect called")
 
     def onHeartbeat(self):
-        #Domoticz.Log("onHeartbeat called")
+        Domoticz.Log("onHeartbeat called")
 
         try:
           if self.Goodwe.SerialStatus==False :
             Domoticz.Log("Serialport closed, restarting...")
             try:
-              onStop() 
+              onStop()
             except:
               pass
             onStart()
 
           self.Goodwe.handle()
-          #Domoticz.Log("Goodwe handle exited ok")
+          Domoticz.Log("Goodwe handle exited ok")
           try:
             if (self.Goodwe.inverter.isOnline) :
               goodwe_pv_watt   = self.Goodwe.inverter.pac
@@ -647,4 +614,3 @@ def DumpConfigToLog():
         Domoticz.Debug("Device sValue:   '" + Devices[x].sValue + "'")
         Domoticz.Debug("Device LastLevel: " + str(Devices[x].LastLevel))
     return
-
