@@ -5,7 +5,7 @@ Converted to python for Domoticz
 
 Prerequesites
 -------------
-A RS485 cable to the computer that runs domoticz (see cable.bmp)
+An RS485 cable to the computer that runs domoticz (see file goodwe_rs485_to_usb_cable.JPG)
 In my goodwe inverter, the RS485 connector is located under the WiFi Dongle. This must be removed.
 I am not sure if the RS485 interface operates, when the Wifi Dongle is connected.
 
