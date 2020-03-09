@@ -3,6 +3,10 @@ Domoticz python plugin for Goodwe Solar Inverters via RS485
 Based on C-code by https://github.com/jantenhove
 Converted to python for Domoticz
 
+Status
+------
+Under development. Requires domoticz hardware-timeout to be set to 10 min. 
+
 Prerequesites
 -------------
 An RS485 cable to the computer that runs domoticz (see file goodwe_rs485_to_usb_cable.JPG)
