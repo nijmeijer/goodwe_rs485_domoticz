@@ -6,7 +6,7 @@
 #    serial, time
 #
 """
-<plugin key="Goodwe_RS485" name="Goodwe Solar Inverter via RS485" author="Alex Nijmeijer" version="1.0.1">
+<plugin key="Goodwe_RS485" name="Goodwe Solar Inverter via RS485" author="Alex Nijmeijer" version="1.0.2">
     <params>
         <param field="SerialPort" label="Serial Port" width="150px" required="true"/>
     </params>
@@ -132,8 +132,8 @@ class GoodWeCommunicator :
 
   def stop(self) :
     self.SerialStatus=False
-    self.goodweSerial.close()             # close port
     self.inverter.isOnline = False
+    self.goodweSerial.close()             # close port
 
   def toHex(self,bt):
     s='{bt:02X} '.format(bt=bt)
@@ -183,9 +183,10 @@ class GoodWeCommunicator :
       if (self.debugInverters) :
         s="Marking inverter @ address: {num) as offline".format(num=self.inverter.address)
         Domoticz.Log(s)
-      sendRemoveRegistration(self.inverter.address)  # send in case the inverter thinks we are online
       self.inverter.isOnline = False
       self.inverter.addressConfirmed = False
+      sendRemoveRegistration(self.inverter.address)  # send in case the inverter thinks we are online
+
     elif (not(self.inverter.isOnline) and not(newOnline)) : # still offline
       #offline inverter. Reset eday at midnight
       if (self.inverter.eDay > 0 and hour() == 0 and minute() == 0) :
@@ -415,7 +416,9 @@ class GoodWeCommunicator :
     inverter.eDay   = self.bytesToFloat(data[dtPtr: dtPtr+2], 10)
 
     # isonline is set after first batch of data is set so readers get actual data
-    inverter.isOnline = True
+    # some sanity checks:
+    if (inverter.eTotal>1) and (inverter.workMode>0) :
+      inverter.isOnline = True
 
     if (self.debugInverters) :
       s=  'Pac={num:.1f} '.format(num=inverter.pac)
@@ -539,7 +542,7 @@ class BasePlugin:
         Domoticz.Log("onDisconnect called")
 
     def onHeartbeat(self):
-        Domoticz.Log("onHeartbeat called")
+        # Domoticz.Log("onHeartbeat called")
 
         try:
           if self.Goodwe.SerialStatus==False :
@@ -551,7 +554,7 @@ class BasePlugin:
             onStart()
 
           self.Goodwe.handle()
-          Domoticz.Log("Goodwe handle exited ok")
+          # Domoticz.Log("Goodwe handle exited ok")
           try:
             if (self.Goodwe.inverter.isOnline) :
               goodwe_pv_watt   = self.Goodwe.inverter.pac
