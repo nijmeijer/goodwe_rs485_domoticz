@@ -3,17 +3,17 @@
 # Author: Alex Nijmeijer
 #
 # Required Python Packages
-#    serial, time
+#    pyserial, time
 #
 """
-<plugin key="Goodwe_RS485" name="Goodwe Solar Inverter via RS485" author="Alex Nijmeijer" version="1.0.2">
+<plugin key="Goodwe_RS485" name="Goodwe Solar Inverter via RS485" author="Alex Nijmeijer" version="1.0.3">
     <params>
         <param field="SerialPort" label="Serial Port" width="150px" required="true"/>
     </params>
 </plugin>
 """
 
-import subprocess
+#import subprocess
 import time
 import serial
 
@@ -112,7 +112,7 @@ class GoodWeCommunicator :
 
   def connect(self, SerialPort) :
     Domoticz.Log("GoodWe Connect start.")
-    self.goodweSerial = serial.Serial(SerialPort, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout = 0.1 )  # open serial port
+    self.goodweSerial = serial.Serial(port=SerialPort, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout = 0.1 )  # open serial port
     # remove all registered inverters. This is usefull when restarting the ESP. The inverter still thinks it is registered
     # but this program does not know the address. The timeout is 10 minutes.
     for cnt in range(1,2): #256
@@ -419,6 +419,9 @@ class GoodWeCommunicator :
     # some sanity checks:
     if (inverter.eTotal>1) and (inverter.workMode>0) :
       inverter.isOnline = True
+    else :
+      inverter.isOnline = False
+
 
     if (self.debugInverters) :
       s=  'Pac={num:.1f} '.format(num=inverter.pac)
@@ -543,7 +546,6 @@ class BasePlugin:
 
     def onHeartbeat(self):
         # Domoticz.Log("onHeartbeat called")
-
         try:
           if self.Goodwe.SerialStatus==False :
             Domoticz.Log("Serialport closed, restarting...")
@@ -556,7 +558,7 @@ class BasePlugin:
           self.Goodwe.handle()
           # Domoticz.Log("Goodwe handle exited ok")
           try:
-            if (self.Goodwe.inverter.isOnline) :
+            if (self.Goodwe.inverter.isOnline) and (self.Goodwe.inverter.eTotal > 1) :
               goodwe_pv_watt   = self.Goodwe.inverter.pac
               goodwe_wh_total  = self.Goodwe.inverter.eTotal*1000
               #Domoticz.Log("Goodwe: " + str(goodwe_wh_total) + "; " + str(goodwe_pv_watt) )
@@ -567,6 +569,10 @@ class BasePlugin:
         except:
           Domoticz.Log("Goodwe handle failed")
           self.Goodwe.SerialStatus=False
+          if  (self.Goodwe.inverter.eTotal > 1)  :
+              goodwe_wh_total  = self.Goodwe.inverter.eTotal*1000
+              Devices[1].Update(nValue=0, sValue=(str(0) + "; " +str(goodwe_wh_total)) )
+
 
 global _plugin
 _plugin = BasePlugin()
