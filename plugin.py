@@ -26,19 +26,11 @@
 </plugin>
 """
 
-#import Domoticz # as Domoticz
-#import subprocess
 import time
 import serial
 
-#import logging
-#logging.basicConfig()
-#log = logging.getLogger()
-#log.setLevel(logging.DEBUG)
-
 try:
   import Domoticz
-  #import DomoticzEx as Domoticz
 except ImportError:
   import fakeDomoticz as Domoticz
 
