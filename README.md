@@ -1,4 +1,4 @@
-Domoticz python plugin for Goodwe Solar Inverters via RS485
+Domoticz python plugin for Goodwe Solar Inverters via RS485 (not using SEMS or internet)
 
 Based on C-code by https://github.com/jantenhove
 Converted to python for Domoticz
