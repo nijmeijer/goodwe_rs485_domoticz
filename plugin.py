@@ -6,13 +6,27 @@
 #    pyserial, time
 #
 """
-<plugin key="Goodwe_RS485" name="Goodwe Solar Inverter via RS485" author="Alex Nijmeijer" version="1.0.3">
+<plugin key="Goodwe_RS485" name="Goodwe Solar Inverter via RS485" author="Alex Nijmeijer" version="1.0.5">
     <params>
-        <param field="SerialPort" label="Serial Port" width="150px" required="true"/>
+        <param field="SerialPort" label="Serial Port" width="150px" required="true">
+        </param>
+        <param field="Mode6" label="Debug" width="150px">
+            <options>
+                <option label="None" value="0"  default="true" />
+                <option label="Python Only" value="2"/>
+                <option label="Basic Debugging" value="62"/>
+                <option label="Basic+Messages" value="126"/>
+                <option label="Queue" value="128"/>
+                <option label="Connections Only" value="16"/>
+                <option label="Connections+Queue" value="144"/>
+                <option label="All" value="-1"/>
+            </options>
+        </param>
     </params>
 </plugin>
 """
 
+#import Domoticz # as Domoticz
 #import subprocess
 import time
 import serial
@@ -23,9 +37,10 @@ import serial
 #log.setLevel(logging.DEBUG)
 
 try:
-    import Domoticz
+  import Domoticz
+  #import DomoticzEx as Domoticz
 except ImportError:
-    import fakeDomoticz as Domoticz
+  import fakeDomoticz as Domoticz
 
 class CInverter :
   def __init__(self) :
@@ -117,7 +132,7 @@ class GoodWeCommunicator :
     # but this program does not know the address. The timeout is 10 minutes.
     for cnt in range(1,2): #256
       self.sendRemoveRegistration(cnt)
-      time.sleep(1)
+      #time.sleep(1)
     Domoticz.Log("Goodwe Communicator connected")
     self.SerialStatus=True
 
@@ -129,6 +144,7 @@ class GoodWeCommunicator :
     self.startPacketReceived = False
     self.numToRead = 0
     self.lastUsedAddress = 0
+    self.ZeroSend = False
 
   def stop(self) :
     self.SerialStatus=False
@@ -511,32 +527,36 @@ class BasePlugin:
         return
 
     def onStart(self):
-       Domoticz.Log("onStart called")
-       if (len(Devices) == 0 ):
-         Domoticz.Log("Adding devices.")
-         Domoticz.Device("Test1", Unit=1, Type=243, Subtype=29).Create()
-       DumpConfigToLog()
-       Domoticz.Log("Plugin is started @ Serial " + Parameters["SerialPort"])
+        Domoticz.Log("BasePlugin onStart called")
+        if Parameters["Mode6"] != "0":
+           Domoticz.Debugging(int(Parameters["Mode6"]))
+           DumpConfigToLog()
 
-       self.Goodwe.start()
-       Domoticz.Log("Goodwe start called")
-       self.Goodwe.connect(Parameters["SerialPort"])
-       Domoticz.Log("Goodwe connect called")
+        if (len(Devices) == 0 ):
+          Domoticz.Log("Adding devices.")
+          Domoticz.Device("Solar Power", Unit=1, Type=243, Subtype=29).Create()
 
-       Domoticz.Heartbeat(2) #20
+        Domoticz.Log("Plugin is started @ Serial " + Parameters["SerialPort"])
+
+        self.Goodwe.start()
+        Domoticz.Log("Goodwe start called")
+        self.Goodwe.connect(Parameters["SerialPort"])
+        Domoticz.Log("Goodwe connect called") 
+
+        Domoticz.Heartbeat(5)  # poll inverter every 2 seconds
 
     def onStop(self):
-        Domoticz.Log("onStop called")
+        Domoticz.Log("BasePlugin onStop called")
         self.Goodwe.stop()
 
     def onConnect(self, Connection, Status, Description):
         Domoticz.Log("onConnect called")
 
-    def onMessage(self, Connection, Data, Status, Extra):
+    def onMessage(self, Connection, Data):
         Domoticz.Log("onMessage called")
 
-    def onCommand(self, Unit, Command, Level, Hue):
-        Domoticz.Log("onCommand called for Unit " + str(Unit) + ": Parameter '" + str(Command) + "', Level: " + str(Level))
+    def onCommand(self, DeviceID, Unit, Command, Level, Color):
+        Domoticz.Log("onCommand called for Device " + str(DeviceID) + " Unit " + str(Unit) + ": Parameter '" + str(Command) + "', Level: " + str(Level))
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
         Domoticz.Log("Notification: " + Name + "," + Subject + "," + Text + "," + Status + "," + str(Priority) + "," + Sound + "," + ImageFile)
@@ -545,7 +565,7 @@ class BasePlugin:
         Domoticz.Log("onDisconnect called")
 
     def onHeartbeat(self):
-        # Domoticz.Log("onHeartbeat called")
+        # Domoticz.Log("BasePlugin onHeartbeat called")
         try:
           if self.Goodwe.SerialStatus==False :
             Domoticz.Log("Serialport closed, restarting...")
@@ -563,15 +583,17 @@ class BasePlugin:
               goodwe_wh_total  = self.Goodwe.inverter.eTotal*1000
               #Domoticz.Log("Goodwe: " + str(goodwe_wh_total) + "; " + str(goodwe_pv_watt) )
               Devices[1].Update(nValue=goodwe_pv_watt, sValue=(str(goodwe_pv_watt) + "; " +str(goodwe_wh_total)) )
+              self.ZeroSend=False
           except:
             Domoticz.Log("Error getting info from Goodwe inverter on " + Parameters["SerialPort"] + "Not returning anything")
-            #pass
+
         except:
           Domoticz.Log("Goodwe handle failed")
           self.Goodwe.SerialStatus=False
-          if  (self.Goodwe.inverter.eTotal > 1)  :
+          if  (self.Goodwe.inverter.eTotal > 1)  and (self.ZeroSend==False) :
               goodwe_wh_total  = self.Goodwe.inverter.eTotal*1000
               Devices[1].Update(nValue=0, sValue=(str(0) + "; " +str(goodwe_wh_total)) )
+              self.ZeroSend=True
 
 
 global _plugin
@@ -589,13 +611,13 @@ def onConnect(Connection, Status, Description):
     global _plugin
     _plugin.onConnect(Connection, Status, Description)
 
-def onMessage(Connection, Data, Status, Extra):
+def onMessage(Connection, Data):
     global _plugin
-    _plugin.onMessage(Connection, Data, Status, Extra)
+    _plugin.onMessage(Connection, Data)
 
-def onCommand(Unit, Command, Level, Hue):
+def onCommand(DeviceID, Unit, Command, Level, Color):
     global _plugin
-    _plugin.onCommand(Unit, Command, Level, Hue)
+    _plugin.onCommand(DeviceID, Unit, Command, Level, Color)
 
 def onNotification(Name, Subject, Text, Status, Priority, Sound, ImageFile):
     global _plugin
@@ -609,17 +631,23 @@ def onHeartbeat():
     global _plugin
     _plugin.onHeartbeat()
 
-    # Generic helper functions
+# Generic helper functions
 def DumpConfigToLog():
+    Domoticz.Debug("Parameters:")
     for x in Parameters:
         if Parameters[x] != "":
             Domoticz.Debug( "'" + x + "':'" + str(Parameters[x]) + "'")
+    Domoticz.Debug("Devices:")
     Domoticz.Debug("Device count: " + str(len(Devices)))
-    for x in Devices:
-        Domoticz.Debug("Device:           " + str(x) + " - " + str(Devices[x]))
-        Domoticz.Debug("Device ID:       '" + str(Devices[x].ID) + "'")
-        Domoticz.Debug("Device Name:     '" + Devices[x].Name + "'")
-        Domoticz.Debug("Device nValue:    " + str(Devices[x].nValue))
-        Domoticz.Debug("Device sValue:   '" + Devices[x].sValue + "'")
-        Domoticz.Debug("Device LastLevel: " + str(Devices[x].LastLevel))
+    for DeviceName in Devices:
+        Device = Devices[DeviceName]
+        Domoticz.Debug("Device ID:       '" + str(Device.DeviceID) + "'")
+        #Domoticz.Debug("--->Unit Count:      '" + str(len(Device.Units)) + "'")
+        #for UnitNo in Device.Units:
+        #    Unit = Device.Units[UnitNo]
+        #    Domoticz.Debug("--->Unit:           " + str(UnitNo))
+        #    Domoticz.Debug("--->Unit Name:     '" + Unit.Name + "'")
+        #    Domoticz.Debug("--->Unit nValue:    " + str(Unit.nValue))
+        #    Domoticz.Debug("--->Unit sValue:   '" + Unit.sValue + "'")
+        #    Domoticz.Debug("--->Unit LastLevel: " + str(Unit.LastLevel))
     return
