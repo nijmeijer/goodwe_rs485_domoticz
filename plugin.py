@@ -29,10 +29,10 @@
 import time
 import serial
 
-try:
-  import Domoticz
-except ImportError:
-  import fakeDomoticz as Domoticz
+#try:
+import Domoticz
+#except ImportError:
+#  import fakeDomoticz as Domoticz
 
 class CInverter :
   def __init__(self) :
@@ -521,7 +521,8 @@ class BasePlugin:
     def onStart(self):
         Domoticz.Log("BasePlugin onStart called")
         if Parameters["Mode6"] != "0":
-           Domoticz.Debugging(int(Parameters["Mode6"]))
+           Domoticz.Debugging((Parameters["Mode6"]))
+           #Domoticz.Debugging(int(Parameters["Mode6"]))
            DumpConfigToLog()
 
         if (len(Devices) == 0 ):
