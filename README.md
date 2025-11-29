@@ -3,6 +3,10 @@ Domoticz python plugin for Goodwe Solar Inverters via RS485/modbus (not using SE
 Based on C-code by https://github.com/jantenhove
 Converted to python for Domoticz
 
+Changes:
+  29/11/2025 Added Power Limit setting (fixed percentage in the python code). To be made adjustable by a domoticz control in the future.
+
+
 Status
 ------
 Under development. Requires domoticz hardware-timeout to be set to 10 min. 
@@ -15,8 +19,8 @@ I am not sure if the RS485 interface operates, when the Wifi Dongle is connected
 
 Limitations
 ------------
-Currently only a single Inverter is supported (since I own just one)
-However, multiple inverters can be connected to a single RS485 bus. 
+Although multiple inverters can be connected to a single RS485 bus, this plugin only supports a single Inverter (since I own just one).
+
 
 Install
 -----------

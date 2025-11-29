@@ -6,7 +6,7 @@
 #    pyserial, time
 #
 """
-<plugin key="Goodwe_RS485" name="Goodwe Solar Inverter via RS485" author="Alex Nijmeijer" version="1.0.5">
+<plugin key="Goodwe_RS485" name="Goodwe Solar Inverter via RS485" author="Alex Nijmeijer" version="1.0.6">
     <params>
         <param field="SerialPort" label="Serial Port" width="150px" required="true">
         </param>
@@ -42,6 +42,7 @@ class CInverter :
     self.lastSeen = 0               # when was the inverter last seen? If not seen for 30 seconds the inverter is marked offline.
     self.isOnline = False           # is the inverter online (see above)
     self.isDTSeries = False         # is tri phase inverter (get phase 2, 3 info)
+    
     self.vpv1=0.0
     self.vpv2=0.0
     self.ipv1=0.0
@@ -78,11 +79,12 @@ class CInverter :
 class GoodWeCommunicator :
   def __init__(self) :
     self.inputBuffer = bytearray()
-    self.debugPackets = False
+    self.debugPackets = True
     self.debugInverters = True
     self.GOODWE_COMMS_ADDRES = 0xFE
     self.DISCOVERY_INTERVAL_SECS = 60     # 10 secs between disovery
     self.PACKET_TIMEOUT_SECS = 5          # 5 sec packet timeout
+    self.PowerLimitAcknoledged = False
 
     self.inverter = CInverter()
 
@@ -193,6 +195,7 @@ class GoodWeCommunicator :
         Domoticz.Log(s)
       self.inverter.isOnline = False
       self.inverter.addressConfirmed = False
+      self.PowerLimitAcknoledged = False
       sendRemoveRegistration(self.inverter.address)  # send in case the inverter thinks we are online
 
     elif (not(self.inverter.isOnline) and not(newOnline)) : # still offline
@@ -294,6 +297,16 @@ class GoodWeCommunicator :
        self.handleRegistrationConfirmation(incomingData[0])             #   -> address
     elif (incomingData[2] == 0x01 and incomingData[3] == 0x81) :        #01 81 Resonse Running Info
       self.handleIncomingInformation(incomingData[0], incomingData[5:len(incomingData) - 2]) # + 5) payload
+    elif (incomingData[2] == 0x03 and incomingData[3] == 0x9E) :        #03 9E Adjust Real Power Response
+      self.handlePowerLimitAck(incomingData[4])
+
+  def handlePowerLimitAck(self, Ack) :
+   if (Ack==0x01) :
+      Domoticz.Log("Power Limit Acknowledged.")
+      self.PowerLimitAcknoledged = True
+   else :
+      Domoticz.Log("Unknown Power Limit Acknowledgement {}".format(Ack))
+   pass
 
 
   def handleRegistration(self, serialNumber) :
@@ -468,6 +481,12 @@ class GoodWeCommunicator :
   def askInverterForInformation(self, address) :
     self.sendData(address, 0x01, 0x01, bytearray())
 
+  def SetPowerLimit(self, limit) :
+    limit_bytearray=limit.to_bytes(1, 'big')
+    self.sendData(self.inverter.address, 0x03, 0x1E, bytearray(limit_bytearray))  #addr, controlcode, function data=adjust Real Power (in %)
+    #pass
+
+
   def getInverterInfoByAddress(self, address) :
     #for chr in range(1, 1) # inverters.size())
     # check inverter 
@@ -501,15 +520,20 @@ class GoodWeCommunicator :
     if (time.time() - self.lastDiscoverySentSeconds >= self.DISCOVERY_INTERVAL_SECS) :
       self.sendDiscovery()
       self.lastDiscoverySentSeconds = time.time()
+      self.checkIncomingData()
+
+
 
     # ask for info update every second
     if (time.time() - self.lastDiscoverySentSeconds >= 1) :
       self.askAllInvertersForInformation()
       self.lastDiscoverySentSeconds = time.time()
-    self.checkIncomingData()
+      self.checkIncomingData()
 
-
-
+    if (self.PowerLimitAcknoledged==False) :
+      # set powerlimit
+      self.SetPowerLimit(10)  #10: 330 W?
+      self.checkIncomingData()
 
 class BasePlugin:
     enabled = False
